@@ -1,4 +1,7 @@
 #include "SteeringBehaviors.h"
+
+#include <Programs/UnrealBuildAccelerator/Core/Public/UbaBase.h>
+
 #include "GameAIProg/Movement/SteeringBehaviors/SteeringAgent.h"
 #include "DrawDebugHelpers.h"
 
@@ -80,4 +83,29 @@ SteeringOutput Face::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
 	Agent.SetMaxLinearSpeed(0); // stop any movement :)
 	
 	return Steering;
+}
+
+SteeringOutput Pursuit::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
+{
+	SteeringOutput Steering{};
+	
+	FVector2D DistanceVector = Target.Position - Agent.GetPosition();
+	const float DistanceToTarget{static_cast<float>(DistanceVector.Length())};
+	float Time{DistanceToTarget/Agent.GetMaxLinearSpeed()};
+	
+	// Optional clamp time
+	constexpr float MaxPredictionTime{4};
+	Time = uba::Min(Time, MaxPredictionTime);
+	
+	//Predict position
+	const FVector2D PredictedPosition = Target.Position + Target.LinearVelocity * Time;
+	
+	Steering.LinearVelocity = PredictedPosition - Agent.GetPosition();
+	
+	//Don't move if stands in the predicted position
+	constexpr float CloseDstSquared{25.f};
+	if (Steering.LinearVelocity.SquaredLength() <= CloseDstSquared)
+		Steering.LinearVelocity = FVector2D::ZeroVector;
+	
+	return Steering; 
 }
