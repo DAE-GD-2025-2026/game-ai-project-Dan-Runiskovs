@@ -8,9 +8,12 @@
 SteeringOutput Seek::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
 {
 	SteeringOutput Steering{};
+	constexpr float CloseDstSquared{25.f};
 	
 	Steering.LinearVelocity = Target.Position - Agent.GetPosition();
-	Steering.LinearVelocity.Normalize();
+	
+	if (Steering.LinearVelocity.SquaredLength() <= CloseDstSquared)
+		Steering.LinearVelocity = FVector2D::ZeroVector;	
 	
 	//TODO: Add debug rendering for grades!
 	
@@ -65,6 +68,16 @@ SteeringOutput Arrive::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
 					false, -1, 0, 0, 
 					FVector(0,1,0), FVector(1,0,0), false);
 #pragma endregion
+	
+	return Steering;
+}
+
+SteeringOutput Face::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
+{
+	SteeringOutput Steering{};
+	
+	Steering.LinearVelocity = Target.Position - Agent.GetPosition();
+	Agent.SetMaxLinearSpeed(0); // stop any movement :)
 	
 	return Steering;
 }
