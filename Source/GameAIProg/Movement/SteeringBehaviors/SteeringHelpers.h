@@ -124,3 +124,9 @@ struct SteeringOutput final
 		return *this;
 	}
 };
+
+inline float ToRadians(float degrees)
+{
+	const float Radians = degrees * PI / 180.f;
+	return Radians;
+}

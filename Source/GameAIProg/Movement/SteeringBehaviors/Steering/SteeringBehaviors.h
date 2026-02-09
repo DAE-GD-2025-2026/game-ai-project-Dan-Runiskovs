@@ -32,7 +32,7 @@ public:
 	Seek() = default;
 	virtual  ~Seek() override = default;
 	
-	//steering
+	//Seek Behavior
 	virtual SteeringOutput CalculateSteering(float DeltaT, ASteeringAgent & Agent) override;
 };
 
@@ -42,7 +42,7 @@ public:
 	Flee() = default;
 	virtual ~Flee() override = default;
 	
-	//steering
+	//Flee Behavior
 	virtual SteeringOutput CalculateSteering(float DeltaT, ASteeringAgent & Agent) override;
 };
 
@@ -52,7 +52,7 @@ public:
 	Arrive() = default;
 	virtual ~Arrive() override = default;
 	
-	//steering
+	//Arrive Behavior
 	virtual SteeringOutput CalculateSteering(float DeltaT, ASteeringAgent & Agent) override;
 };
 
@@ -62,7 +62,7 @@ public:
 	Face() = default;
 	virtual ~Face() override = default;
 	
-	//steering
+	//Face Behavior
 	virtual SteeringOutput CalculateSteering(float DeltaT, ASteeringAgent & Agent) override;
 };
 
@@ -72,7 +72,7 @@ public:
 	Pursuit() = default;
 	virtual ~Pursuit() override = default;
 	
-	//steering
+	//Pursuit Behavior
 	virtual SteeringOutput CalculateSteering(float DeltaT, ASteeringAgent & Agent) override;
 };
 
@@ -82,6 +82,26 @@ public:
 	Evade() = default;
 	virtual ~Evade() override = default;
 	
-	//steering
+	//Evade Behavior
 	virtual SteeringOutput CalculateSteering(float DeltaT, ASteeringAgent & Agent) override;
+};
+
+class Wander : public Seek
+{
+public:
+	Wander() = default;
+	virtual ~Wander() override = default;
+	
+	//Wander Behavior
+	SteeringOutput CalculateSteering(float DeltaT, ASteeringAgent & Agent) override;
+	
+	void SetWanderOffset(float offset)	{m_OffsetDistance = offset;}
+	void SetWanderRadius(float radius)	{m_Radius = radius;}
+	void SetMaxAngleChange(float rad)	{m_MaxAngleChange = rad;}
+	
+protected:
+	float m_OffsetDistance{120.f};					// Offset (Agent Direction)
+	float m_Radius{80.f};							// WanderRadius
+	float m_MaxAngleChange{ToRadians(45)};	// Max WanderAngle change per frame
+	float m_WanderAngle{};							// Internal
 };

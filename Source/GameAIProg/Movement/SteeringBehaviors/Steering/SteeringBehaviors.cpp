@@ -144,3 +144,40 @@ SteeringOutput Evade::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
 	
 	return Steering;
 }
+
+SteeringOutput Wander::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
+{
+	FVector2D Forward{Agent.GetVelocity().X, Agent.GetVelocity().Y};
+	if (!Forward.Normalize())
+	{
+		Forward = FVector2D(1.f,0.f);
+	}
+	
+	// Calculate Circle Center (the one in front, duh)
+	const FVector2D CircleCenter{Agent.GetPosition() + Forward * m_OffsetDistance};
+	
+	// Get a random angle change
+	float deltaAngle{ FMath::FRandRange(-m_MaxAngleChange, m_MaxAngleChange) };
+	m_WanderAngle += deltaAngle * DeltaT;
+	
+	// Local offset
+	FVector2D LocalOffset{cos(m_WanderAngle), sin(m_WanderAngle)};
+	LocalOffset *= m_Radius;
+
+	// Convert to world
+	FVector Right = FVector::CrossProduct(FVector(0,0,1),FVector(Forward.X, Forward.Y, 0));
+	FVector2D Right2D{Right.X, Right.Y};
+	FVector2D WorldOffset = Forward * LocalOffset.X + Right2D * LocalOffset.Y;
+	
+	// Seek the target
+	Target.Position = CircleCenter + WorldOffset;
+	
+#pragma region DebugDrawing
+	const FVector CirclePosition{CircleCenter.X, CircleCenter.Y, 10};
+	DrawDebugCircle(Agent.GetWorld(), CirclePosition, m_Radius, 10, FColor::Blue,
+					false, -1, 0, 0, 
+					FVector(0,1,0), FVector(1,0,0), false);
+#pragma endregion
+	
+	return Seek::CalculateSteering(DeltaT, Agent);
+}
