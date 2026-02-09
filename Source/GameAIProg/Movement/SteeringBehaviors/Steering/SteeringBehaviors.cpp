@@ -15,3 +15,13 @@ SteeringOutput Seek::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
 	
 	return Steering;
 }
+
+SteeringOutput Flee::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
+{
+	SteeringOutput Steering{};
+	
+	Steering.LinearVelocity = -(Target.Position - Agent.GetPosition());
+	Steering.LinearVelocity.Normalize();
+	
+	return Steering; 
+}
