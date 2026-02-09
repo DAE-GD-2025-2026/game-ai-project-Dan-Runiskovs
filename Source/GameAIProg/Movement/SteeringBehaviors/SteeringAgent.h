@@ -70,4 +70,5 @@ public:
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
 	void SetSteeringBehavior(ISteeringBehavior* NewSteeringBehavior);
+	void ResetMaxSpeed() {SetMaxLinearSpeed(600.f);};
 };

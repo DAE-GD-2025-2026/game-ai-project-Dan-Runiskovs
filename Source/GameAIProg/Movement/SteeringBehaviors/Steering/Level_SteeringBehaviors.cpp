@@ -232,12 +232,15 @@ void ALevel_SteeringBehaviors::SetAgentBehavior(ImGui_Agent& Agent)
 		case BehaviorTypes::Flee:
 			Agent.Behavior = std::make_unique<Flee>();
 			break;
+		case BehaviorTypes::Arrive:
+			Agent.Behavior = std::make_unique<Arrive>();
+			break;
 		default:
 			assert(false);
 	}
 
 	UpdateTarget(Agent);
-	
+	//Agent.Agent->ResetMaxSpeed();
 	Agent.Agent->SetSteeringBehavior(Agent.Behavior.get());
 }
 
