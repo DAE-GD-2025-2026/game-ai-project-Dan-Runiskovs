@@ -4,6 +4,7 @@
 
 #include "GameAIProg/Movement/SteeringBehaviors/SteeringAgent.h"
 #include "DrawDebugHelpers.h"
+#include "VectorTypes.h"
 
 //SEEK
 //*******
@@ -108,4 +109,38 @@ SteeringOutput Pursuit::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
 		Steering.LinearVelocity = FVector2D::ZeroVector;
 	
 	return Steering; 
+}
+
+SteeringOutput Evade::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
+{
+	SteeringOutput Steering{};
+	
+	constexpr float EvadeRadius{400.f};
+	FVector2D ToThreat{Target.Position - Agent.GetPosition()};
+	const float DistanceToThreat{static_cast<float>(ToThreat.Length())};
+	
+	// If outside Evade radius -> do nothing
+	if (DistanceToThreat > EvadeRadius)
+	{
+		return Steering;
+	}
+	
+	// Clamp prediction Time
+	float Time{DistanceToThreat/Agent.GetMaxLinearSpeed()};
+	Time = uba::Min(Time, 4.f);
+	
+	FVector2D PredictedThreatPosition{ Target.Position + Target.LinearVelocity * Time};
+	FVector2D DesiredPosition{(Agent.GetPosition() - PredictedThreatPosition) * Agent.GetMaxLinearSpeed()}; 
+	
+	Steering.LinearVelocity = DesiredPosition;
+	
+#pragma region DebugDrawing
+	const FVector Position{ Agent.GetPosition().X, Agent.GetPosition().Y, 10};
+	static const FColor EvadeColor{FColor::Red};
+	DrawDebugCircle(Agent.GetWorld(), Position, EvadeRadius, 20, EvadeColor,
+					false, -1, 0, 0, 
+					FVector(0,1,0), FVector(1,0,0), false);
+#pragma endregion
+	
+	return Steering;
 }
