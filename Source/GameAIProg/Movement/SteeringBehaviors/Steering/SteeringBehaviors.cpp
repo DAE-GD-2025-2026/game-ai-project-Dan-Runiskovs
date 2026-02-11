@@ -12,7 +12,8 @@ void ISteeringBehavior::DrawDebug(const ASteeringAgent& Agent)
 	const FColor Cyan { FColor::Cyan };
 	// Data
 	const FVector Position{ Agent.GetPosition().X, Agent.GetPosition().Y, 10 };
-	const FVector Velocity{ Agent.GetVelocity().X, Agent.GetVelocity().Y, 0 };
+	const FVector Velocity {Agent.GetVelocity().X, Agent.GetVelocity().Y, 0};
+	
 	// Math
 	const FVector Forward = Agent.GetActorForwardVector().GetSafeNormal();
 	const FVector VelNorm = Velocity.GetSafeNormal();
@@ -63,7 +64,7 @@ SteeringOutput Flee::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
 	SteeringOutput Steering{};
 	
 	Steering.LinearVelocity = -(Target.Position - Agent.GetPosition());
-	Steering.LinearVelocity.Normalize();
+	//Steering.LinearVelocity.Normalize();
 	
 	DrawDebug(Agent);
 	return Steering; 
@@ -220,8 +221,8 @@ SteeringOutput Wander::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
 	LocalOffset *= m_Radius;
 
 	// Convert to world
-	FVector Right = FVector::CrossProduct(FVector(0,0,1),FVector(Forward.X, Forward.Y, 0));
-	FVector WorldOffset = Forward * LocalOffset.X + Right * LocalOffset.Y;
+	const FVector Right = Agent.GetActorRightVector();
+	const FVector WorldOffset = Forward * LocalOffset.X + Right * LocalOffset.Y;
 	
 	// Seek the target
 	const FVector NewTargetPos{ m_CircleCenter + WorldOffset };
