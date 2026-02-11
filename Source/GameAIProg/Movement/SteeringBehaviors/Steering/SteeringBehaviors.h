@@ -14,6 +14,7 @@ public:
 
 	// Override to implement your own behavior
 	virtual SteeringOutput CalculateSteering(float DeltaT, ASteeringAgent & Agent) = 0;
+	virtual void DrawDebug(const ASteeringAgent & Agent);
 
 	void SetTarget(const FTargetData& NewTarget) { Target = NewTarget; }
 	
@@ -54,6 +55,11 @@ public:
 	
 	//Arrive Behavior
 	virtual SteeringOutput CalculateSteering(float DeltaT, ASteeringAgent & Agent) override;
+	virtual void DrawDebug(const ASteeringAgent & Agent) override;
+
+protected:
+	const float m_SlowRadius{300.f};
+	const float m_TargetRadius{100.f};
 };
 
 class Face : public ISteeringBehavior
@@ -84,6 +90,10 @@ public:
 	
 	//Evade Behavior
 	virtual SteeringOutput CalculateSteering(float DeltaT, ASteeringAgent & Agent) override;
+	virtual void DrawDebug(const ASteeringAgent & Agent) override;
+
+protected:
+	const float m_EvadeRadius{400.f};
 };
 
 class Wander : public Seek
@@ -93,15 +103,19 @@ public:
 	virtual ~Wander() override = default;
 	
 	//Wander Behavior
-	SteeringOutput CalculateSteering(float DeltaT, ASteeringAgent & Agent) override;
+	virtual SteeringOutput CalculateSteering(float DeltaT, ASteeringAgent & Agent) override;
+	virtual void DrawDebug(const ASteeringAgent & Agent) override;
 	
 	void SetWanderOffset(float offset)	{m_OffsetDistance = offset;}
 	void SetWanderRadius(float radius)	{m_Radius = radius;}
 	void SetMaxAngleChange(float rad)	{m_MaxAngleChange = rad;}
 	
 protected:
-	float m_OffsetDistance{120.f};					// Offset (Agent Direction)
-	float m_Radius{80.f};							// WanderRadius
-	float m_MaxAngleChange{ToRadians(45)};	// Max WanderAngle change per frame
-	float m_WanderAngle{};							// Internal
+	float m_OffsetDistance{120.f};								// Offset (Agent Direction)
+	float m_Radius{80.f};										// WanderRadius
+	float m_MaxAngleChange{FMath::DegreesToRadians(45)};	// Max WanderAngle change per frame
+	float m_WanderAngle{};										// Internal
+	
+private:
+	FVector m_CircleCenter{};
 };
