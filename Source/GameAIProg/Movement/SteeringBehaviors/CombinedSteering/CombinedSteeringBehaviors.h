@@ -3,8 +3,6 @@
 
 #include "../Steering/SteeringBehaviors.h"
 
-class Flock;
-
 //****************
 //BLENDED STEERING
 class BlendedSteering final: public ISteeringBehavior
@@ -24,8 +22,10 @@ public:
 	BlendedSteering(const std::vector<WeightedBehavior>& WeightedBehaviors);
 
 	void AddBehaviour(const WeightedBehavior& WeightedBehavior) { WeightedBehaviors.push_back(WeightedBehavior); }
-	virtual SteeringOutput CalculateSteering(float DeltaT, ASteeringAgent& Agent) override;
+	SteeringOutput CalculateSteering(float DeltaT, ASteeringAgent& Agent) override;
 
+	float* GetWeight(ISteeringBehavior* const SteeringBehavior);
+	
 	// returns a reference to the weighted behaviors, can be used to adjust weighting. Is not intended to alter the behaviors themselves.
 	std::vector<WeightedBehavior>& GetWeightedBehaviorsRef() { return WeightedBehaviors; }
 

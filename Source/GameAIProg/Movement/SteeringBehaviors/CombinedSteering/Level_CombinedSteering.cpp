@@ -1,7 +1,7 @@
-﻿#include "Level_CombinedSteering.h"
-
+#include "Level_CombinedSteering.h"
+#include <format>
+#include <iostream>
 #include "imgui.h"
-
 
 // Sets default values
 ALevel_CombinedSteering::ALevel_CombinedSteering()
@@ -14,13 +14,126 @@ ALevel_CombinedSteering::ALevel_CombinedSteering()
 void ALevel_CombinedSteering::BeginPlay()
 {
 	Super::BeginPlay();
-
+	
+	AddAgent(BehaviorTypes::BlendedSteering);
+	AddAgent(BehaviorTypes::PrioritySteering);
+	
+	SteeringAgents[0].Agent->SetDebugRenderingEnabled(true);
+	SteeringAgents[1].SelectedTarget = 0;
 }
 
 void ALevel_CombinedSteering::BeginDestroy()
 {
 	Super::BeginDestroy();
+	
+	delete m_pEvade;
+	delete m_pWander;
+	delete m_pPrioritySteering;
+}
 
+bool ALevel_CombinedSteering::AddAgent(BehaviorTypes BehaviorType, bool AutoOrient)
+{
+	ImGui_Agent ImGuiAgent = {};
+	ImGuiAgent.Agent = GetWorld()->SpawnActor<ASteeringAgent>(SteeringAgentClass, FVector{0,0,90}, FRotator::ZeroRotator);
+	if (IsValid(ImGuiAgent.Agent))
+	{
+		ImGuiAgent.SelectedBehavior = static_cast<int>(BehaviorType);
+		ImGuiAgent.SelectedTarget = -1; // Mouse
+		
+		SetAgentBehavior(ImGuiAgent);
+
+		SteeringAgents.push_back(std::move(ImGuiAgent));
+		
+		RefreshTargetLabels();
+
+		return true;
+	}
+
+	return false;
+}
+
+void ALevel_CombinedSteering::RemoveAgent(unsigned int Index)
+{
+	SteeringAgents[Index].Agent->Destroy();
+	SteeringAgents.erase(SteeringAgents.begin() + Index);
+
+	RefreshTargetLabels();
+	RefreshAgentTargets(Index);
+}
+
+void ALevel_CombinedSteering::SetAgentBehavior(ImGui_Agent& Agent)
+{
+	Agent.Behavior.reset();
+	
+	auto pSeek = new Seek(); 
+	auto pWander = new Wander();
+	std::vector<BlendedSteering::WeightedBehavior> drunkBehaviours;
+	drunkBehaviours.emplace_back(pSeek, 0.5f);
+	drunkBehaviours.emplace_back(pWander, 0.5f);
+	
+	switch (static_cast<BehaviorTypes>(Agent.SelectedBehavior))
+	{
+	case BehaviorTypes::BlendedSteering:
+		Agent.Behavior = std::make_unique<BlendedSteering>(drunkBehaviours);
+		pBlendedSteering = static_cast<BlendedSteering*>(Agent.Behavior.get());
+		break;
+	case BehaviorTypes::PrioritySteering:
+		Agent.Behavior = std::make_unique<PrioritySteering>(*m_pPrioritySteering);
+		break;
+	default:
+		assert(false);
+	}
+
+	UpdateTarget(Agent);
+	Agent.Agent->ResetMaxSpeed();
+	Agent.Agent->SetSteeringBehavior(Agent.Behavior.get());
+}
+
+void ALevel_CombinedSteering::RefreshTargetLabels()
+{
+	TargetLabels.clear();
+	
+	TargetLabels.push_back("Mouse");
+	for (int i{0}; i < SteeringAgents.size(); ++i)
+	{
+		TargetLabels.push_back(std::format("Agent {}", i));
+	}
+}
+
+void ALevel_CombinedSteering::UpdateTarget(ImGui_Agent& Agent)
+{
+	bool const bUseMouseAsTarget = Agent.SelectedTarget < 0;
+	if (!bUseMouseAsTarget)
+	{
+		ASteeringAgent* const TargetAgent = SteeringAgents[Agent.SelectedTarget].Agent;
+
+		FTargetData Target;
+		Target.Position = TargetAgent->GetPosition();
+		Target.Orientation = TargetAgent->GetRotation();
+		Target.LinearVelocity = TargetAgent->GetLinearVelocity();
+		Target.AngularVelocity = TargetAgent->GetAngularVelocity();
+
+		Agent.Behavior->SetTarget(Target);
+	}
+	else
+	{
+		Agent.Behavior->SetTarget(MouseTarget);
+	}
+}
+
+void ALevel_CombinedSteering::RefreshAgentTargets(unsigned int IndexRemoved)
+{
+	for (UINT i = 0; i < SteeringAgents.size(); ++i)
+	{
+		if (i >= IndexRemoved)
+		{
+			auto& Agent = SteeringAgents[i];
+			if (Agent.SelectedTarget == IndexRemoved || i  == Agent.SelectedTarget)
+			{
+				--Agent.SelectedTarget;
+			}
+		}
+	}
 }
 
 // Called every frame
@@ -67,7 +180,7 @@ void ALevel_CombinedSteering::Tick(float DeltaTime)
 	
 		if (ImGui::Checkbox("Debug Rendering", &CanDebugRender))
 		{
-   // TODO: Handle the debug rendering of your agents here :)
+			// TODO: Handle the debug rendering of your agents here :)
 		}
 		ImGui::Checkbox("Trim World", &TrimWorld->bShouldTrimWorld);
 		if (TrimWorld->bShouldTrimWorld)
@@ -76,28 +189,138 @@ void ALevel_CombinedSteering::Tick(float DeltaTime)
 				TrimWorld->GetTrimWorldSize(), 1000.f, 3000.f,
 				[this](float InVal) { TrimWorld->SetTrimWorldSize(InVal); });
 		}
+		ImGui::Spacing();
+
+#pragma region PerAgentUI
+		if (ImGui::Button("Add Agent"))
+			AddAgent(BehaviorTypes::BlendedSteering);
+		ImGui::Separator();
+
+		for (int i{0}; i < SteeringAgents.size(); ++i)
+		{
+			ImGui::PushID(i);
+			ImGui_Agent& a = SteeringAgents[i];
 		
-		ImGui::Spacing();
-		ImGui::Spacing();
-		ImGui::Spacing();
-	
-		ImGui::Text("Behavior Weights");
-		ImGui::Spacing();
+			std::string agentHeader{std::format("Agent {}:", i)};
+			if (ImGui::CollapsingHeader(agentHeader.c_str()))
+			{
+				ImGui::Indent();
+				//Actor Props
+				if (ImGui::CollapsingHeader("Properties"))
+				{
+					float v = a.Agent->GetMaxLinearSpeed();
+					if (ImGui::SliderFloat("Lin", &v, 0.f, 600.f, "%.2f"))
+						a.Agent->SetMaxLinearSpeed(v);
 
+					v = a.Agent->GetMaxAngularSpeed();
+					if (ImGui::SliderFloat("Ang", &v, 0.f, 360.f, "%.2f"))
+						a.Agent->SetMaxAngularSpeed(v);
 
-		// ImGuiHelpers::ImGuiSliderFloatWithSetter("Seek",
-		// 	pBlendedSteering->GetWeightedBehaviorsRef()[0].Weight, 0.f, 1.f,
-		// 	[this](float InVal) { pBlendedSteering->GetWeightedBehaviorsRef()[0].Weight = InVal; }, "%.2f");
-		//
-		// ImGuiHelpers::ImGuiSliderFloatWithSetter("Wander",
-		// pBlendedSteering->GetWeightedBehaviorsRef()[1].Weight, 0.f, 1.f,
-		// [this](float InVal) { pBlendedSteering->GetWeightedBehaviorsRef()[1].Weight = InVal; }, "%.2f");
+					v = a.Agent->GetMass();
+					if (ImGui::SliderFloat("Mass ", &v, 0.f, 100.f, "%.2f"))
+						a.Agent->SetMass(v);
+				}
+			
+				bool bBehaviourModified = false;
+
+				ImGui::Spacing();
+				ImGui::PushID(i + 50);
+				ImGui::Text(" Behavior: ");
+				ImGui::SameLine();
+				ImGui::PushItemWidth(100);
+
+				// Add the names of your steering behaviors
+				if (ImGui::Combo("", &a.SelectedBehavior, "Blended Steering\0PrioritySteering", 4))
+				{
+					bBehaviourModified = true;
+				}
+				ImGui::PopItemWidth();
+				ImGui::PopID();
+
+			
+				ImGui::Spacing();
+				ImGui::PushID(i + 100);
+				ImGui::Text(" Target: ");
+				ImGui::SameLine();
+				ImGui::PushItemWidth(100);
+			
+				int selectedTargetOffset = a.SelectedTarget + 1;
+				std::string const Label{""};
+				std::string Targets{};
+				for (auto const & Target : TargetLabels)
+				{
+					Targets += Target;
+					Targets += '\0';
+				}
+				if (ImGui::Combo(Label.c_str(), &selectedTargetOffset, Targets.c_str()))
+				{
+					a.SelectedTarget = selectedTargetOffset - 1;
+					bBehaviourModified = true;
+				}
+			
+				ImGui::PopItemWidth();
+				ImGui::PopID();
+				ImGui::Spacing();
+				ImGui::Spacing();
+			
+			
+				if (bBehaviourModified)
+					SetAgentBehavior(a);
+
+				if (ImGui::Button("x"))
+				{
+					AgentIndexToRemove = i;
+				}
+
+				ImGui::SameLine(0, 20);
+
+				bool isChecked = a.Agent->GetDebugRenderingEnabled();
+				if (ImGui::Checkbox("Debug Rendering", &isChecked))
+				{
+					a.Agent->SetDebugRenderingEnabled(isChecked);
+				}
+
+				ImGui::Unindent();
+			}
+#pragma endregion 
+			
+			ImGui::Spacing();
 	
+			ImGui::Text("Behavior Weights");
+			ImGui::Spacing();
+			
+			// Should only be visible if agent is using BlendedSteering
+			ImGuiHelpers::ImGuiSliderFloatWithSetter("Seek",
+				 pBlendedSteering->GetWeightedBehaviorsRef()[0].Weight, 0.f, 1.f,
+				 [this](const float InVal){pBlendedSteering->GetWeightedBehaviorsRef()[0].Weight = InVal; }, "%.2f");
+		
+			ImGuiHelpers::ImGuiSliderFloatWithSetter("Wander",
+				pBlendedSteering->GetWeightedBehaviorsRef()[1].Weight, 0.f, 1.f,
+				[this](const float InVal){ pBlendedSteering->GetWeightedBehaviorsRef()[1].Weight = InVal; }, "%.2f");
+			
+			ImGui::PopID();
+		}
+		
+		if (AgentIndexToRemove >= 0)
+		{
+			RemoveAgent(AgentIndexToRemove);
+			AgentIndexToRemove = -1;
+		}
 		//End
 		ImGui::End();
 	}
-#pragma endregion
-
-	// Combined Steering Update
+#pragma endregion 
+		
+	for (ImGui_Agent& a : SteeringAgents)
+	{
+		if (a.Agent)
+		{
+		UpdateTarget(a);
+		}
+	}
+		// Combined Steering Update
+		// TODO: implement handling mouse click input for seek
+	pBlendedSteering->SetTarget(MouseTarget);
+		// TODO: implement Make sure to also evade the wanderer
+	
 }
-

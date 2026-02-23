@@ -178,6 +178,7 @@ SteeringOutput Evade::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
 	// If outside Evade radius -> do nothing
 	if (DistanceToThreat > m_EvadeRadius)
 	{
+		Steering.IsValid = false;
 		return Steering;
 	}
 	
