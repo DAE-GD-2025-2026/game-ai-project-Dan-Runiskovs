@@ -111,9 +111,9 @@ public:
 	void SetMaxAngleChange(float rad)	{m_MaxAngleChange = rad;}
 	
 protected:
-	float m_OffsetDistance{120.f};								// Offset (Agent Direction)
+	float m_OffsetDistance{140.f};								// Offset (Agent Direction)
 	float m_Radius{80.f};										// WanderRadius
-	float m_MaxAngleChange{FMath::DegreesToRadians(45)};	// Max WanderAngle change per frame
+	float m_MaxAngleChange{FMath::DegreesToRadians(15)};	// Max WanderAngle change per frame
 	float m_WanderAngle{};										// Internal
 	
 private:

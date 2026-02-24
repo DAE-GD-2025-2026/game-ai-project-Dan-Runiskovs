@@ -65,9 +65,5 @@ private:
 	void UpdateTarget(ImGui_Agent& Agent);
 	void RefreshAgentTargets(unsigned int IndexRemoved);
 	
-	BlendedSteering* pBlendedSteering {nullptr};
-	
-	ISteeringBehavior* m_pEvade {new Evade()};
-	ISteeringBehavior* m_pWander{new Wander()};
-	PrioritySteering* m_pPrioritySteering {new PrioritySteering({m_pEvade, m_pWander})};
+	std::vector<std::unique_ptr<ISteeringBehavior>> OwnedBehaviors{};
 };

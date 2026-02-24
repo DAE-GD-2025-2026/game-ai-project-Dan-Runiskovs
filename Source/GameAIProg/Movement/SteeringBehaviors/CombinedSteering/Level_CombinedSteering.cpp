@@ -1,6 +1,5 @@
 #include "Level_CombinedSteering.h"
 #include <format>
-#include <iostream>
 #include "imgui.h"
 
 // Sets default values
@@ -25,10 +24,6 @@ void ALevel_CombinedSteering::BeginPlay()
 void ALevel_CombinedSteering::BeginDestroy()
 {
 	Super::BeginDestroy();
-	
-	delete m_pEvade;
-	delete m_pWander;
-	delete m_pPrioritySteering;
 }
 
 bool ALevel_CombinedSteering::AddAgent(BehaviorTypes BehaviorType, bool AutoOrient)
@@ -65,21 +60,37 @@ void ALevel_CombinedSteering::SetAgentBehavior(ImGui_Agent& Agent)
 {
 	Agent.Behavior.reset();
 	
-	auto pSeek = new Seek(); 
-	auto pWander = new Wander();
-	std::vector<BlendedSteering::WeightedBehavior> drunkBehaviours;
-	drunkBehaviours.emplace_back(pSeek, 0.5f);
-	drunkBehaviours.emplace_back(pWander, 0.5f);
-	
 	switch (static_cast<BehaviorTypes>(Agent.SelectedBehavior))
 	{
 	case BehaviorTypes::BlendedSteering:
-		Agent.Behavior = std::make_unique<BlendedSteering>(drunkBehaviours);
-		pBlendedSteering = static_cast<BlendedSteering*>(Agent.Behavior.get());
-		break;
+		{
+			// Create per-agent sub behaviors (owned by the level to avoid leaks / dangling).
+			auto SeekPtr = std::make_unique<Seek>();
+			auto WanderPtr = std::make_unique<Wander>();
+			ISteeringBehavior* const pSeek = SeekPtr.get();
+			ISteeringBehavior* const pWander = WanderPtr.get();
+			OwnedBehaviors.emplace_back(std::move(SeekPtr));
+			OwnedBehaviors.emplace_back(std::move(WanderPtr));
+
+			std::vector<BlendedSteering::WeightedBehavior> DrunkBehaviours;
+			DrunkBehaviours.emplace_back(pSeek, 0.5f);
+			DrunkBehaviours.emplace_back(pWander, 0.5f);
+
+			Agent.Behavior = std::make_unique<BlendedSteering>(DrunkBehaviours);
+			break;
+		}
 	case BehaviorTypes::PrioritySteering:
-		Agent.Behavior = std::make_unique<PrioritySteering>(*m_pPrioritySteering);
-		break;
+		{
+			auto EvadePtr = std::make_unique<Evade>();
+			auto WanderPtrPrio = std::make_unique<Wander>();
+			ISteeringBehavior* const pEvade = EvadePtr.get();
+			ISteeringBehavior* const pWanderPrio = WanderPtrPrio.get();
+			OwnedBehaviors.emplace_back(std::move(EvadePtr));
+			OwnedBehaviors.emplace_back(std::move(WanderPtrPrio));
+
+			Agent.Behavior = std::make_unique<PrioritySteering>(std::vector<ISteeringBehavior*>{pEvade, pWanderPrio});
+			break;
+		}
 	default:
 		assert(false);
 	}
@@ -290,14 +301,16 @@ void ALevel_CombinedSteering::Tick(float DeltaTime)
 			ImGui::Spacing();
 			
 			// Should only be visible if agent is using BlendedSteering
-			ImGuiHelpers::ImGuiSliderFloatWithSetter("Seek",
-				 pBlendedSteering->GetWeightedBehaviorsRef()[0].Weight, 0.f, 1.f,
-				 [this](const float InVal){pBlendedSteering->GetWeightedBehaviorsRef()[0].Weight = InVal; }, "%.2f");
+			if (a.SelectedBehavior == static_cast<int>(BehaviorTypes::BlendedSteering) && a.Behavior)
+			{
+				ImGuiHelpers::ImGuiSliderFloatWithSetter("Seek",
+				 static_cast<BlendedSteering*>(a.Behavior.get())->GetWeightedBehaviorsRef()[0].Weight, 0.f, 1.f,
+				 [this, &a](const float InVal){static_cast<BlendedSteering*>(a.Behavior.get())->GetWeightedBehaviorsRef()[0].Weight = InVal; }, "%.2f");
 		
-			ImGuiHelpers::ImGuiSliderFloatWithSetter("Wander",
-				pBlendedSteering->GetWeightedBehaviorsRef()[1].Weight, 0.f, 1.f,
-				[this](const float InVal){ pBlendedSteering->GetWeightedBehaviorsRef()[1].Weight = InVal; }, "%.2f");
-			
+				ImGuiHelpers::ImGuiSliderFloatWithSetter("Wander",
+					static_cast<BlendedSteering*>(a.Behavior.get())->GetWeightedBehaviorsRef()[1].Weight, 0.f, 1.f,
+					[this, &a](const float InVal){ static_cast<BlendedSteering*>(a.Behavior.get())->GetWeightedBehaviorsRef()[1].Weight = InVal; }, "%.2f");
+			}
 			ImGui::PopID();
 		}
 		
@@ -318,9 +331,4 @@ void ALevel_CombinedSteering::Tick(float DeltaTime)
 		UpdateTarget(a);
 		}
 	}
-		// Combined Steering Update
-		// TODO: implement handling mouse click input for seek
-	pBlendedSteering->SetTarget(MouseTarget);
-		// TODO: implement Make sure to also evade the wanderer
-	
 }

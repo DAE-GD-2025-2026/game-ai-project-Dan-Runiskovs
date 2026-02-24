@@ -1,5 +1,4 @@
 #include "SteeringBehaviors.h"
-#include <Programs/UnrealBuildAccelerator/Core/Public/UbaBase.h>
 #include "GameAIProg/Movement/SteeringBehaviors/SteeringAgent.h"
 #include "DrawDebugHelpers.h"
 #include "VectorTypes.h"
@@ -55,6 +54,9 @@ SteeringOutput Seek::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
 	if (Steering.LinearVelocity.SquaredLength() <= CloseDstSquared)
 		Steering.LinearVelocity = FVector2D::ZeroVector;	
 	
+	if (!Steering.LinearVelocity.IsNearlyZero())
+		Steering.LinearVelocity.Normalize();
+	
 	DrawDebug(Agent);
 	return Steering;
 }
@@ -65,6 +67,9 @@ SteeringOutput Flee::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
 	
 	Steering.LinearVelocity = -(Target.Position - Agent.GetPosition());
 	//Steering.LinearVelocity.Normalize();
+	
+	if (!Steering.LinearVelocity.IsNearlyZero())
+		Steering.LinearVelocity.Normalize();
 	
 	DrawDebug(Agent);
 	return Steering; 
@@ -152,7 +157,7 @@ SteeringOutput Pursuit::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
 	
 	// Optional clamp time
 	constexpr float MaxPredictionTime{4};
-	Time = uba::Min(Time, MaxPredictionTime);
+	Time = FMath::Min(Time, MaxPredictionTime);
 	
 	//Predict position
 	const FVector2D PredictedPosition = Target.Position + Target.LinearVelocity * Time;
@@ -163,6 +168,9 @@ SteeringOutput Pursuit::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
 	constexpr float CloseDstSquared{25.f};
 	if (Steering.LinearVelocity.SquaredLength() <= CloseDstSquared)
 		Steering.LinearVelocity = FVector2D::ZeroVector;
+	
+	if (!Steering.LinearVelocity.IsNearlyZero())
+		Steering.LinearVelocity.Normalize();
 	
 	DrawDebug(Agent);
 	return Steering; 
@@ -184,12 +192,15 @@ SteeringOutput Evade::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
 	
 	// Clamp prediction Time
 	float Time{DistanceToThreat/Agent.GetMaxLinearSpeed()};
-	Time = uba::Min(Time, 4.f);
+	Time = FMath::Min(Time, 4.f);
 	
 	FVector2D PredictedThreatPosition{ Target.Position + Target.LinearVelocity * Time};
 	FVector2D DesiredPosition{(Agent.GetPosition() - PredictedThreatPosition) * Agent.GetMaxLinearSpeed()}; 
 	
 	Steering.LinearVelocity = DesiredPosition;
+	
+	if (!Steering.LinearVelocity.IsNearlyZero())
+		Steering.LinearVelocity.Normalize();
 	
 	DrawDebug(Agent);
 	return Steering;
@@ -216,6 +227,7 @@ SteeringOutput Wander::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
 	// Get a random angle change
 	float deltaAngle{ FMath::FRandRange(-m_MaxAngleChange, m_MaxAngleChange) };
 	m_WanderAngle += deltaAngle * DeltaT;
+	m_WanderAngle = FMath::UnwindRadians(m_WanderAngle);
 	
 	// Local offset
 	FVector2D LocalOffset{cos(m_WanderAngle), sin(m_WanderAngle)};
