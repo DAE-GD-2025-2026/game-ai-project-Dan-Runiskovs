@@ -28,5 +28,5 @@ protected:
 	TUniquePtr<Flock> pFlock{};
 	
 	UPROPERTY(EditAnywhere, Category = "Flocking")
-	ASteeringAgent* pAgentToEvade{nullptr}; // non owning ref
+	ASteeringAgent* pAgentToEvade{nullptr};
 };

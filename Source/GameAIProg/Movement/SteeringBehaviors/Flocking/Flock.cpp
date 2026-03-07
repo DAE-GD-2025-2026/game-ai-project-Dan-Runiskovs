@@ -1,5 +1,6 @@
 #include "Flock.h"
 #include "FlockingSteeringBehaviors.h"
+#include "GeometryCollection/GeometryCollectionComponent.h"
 #include "Shared/ImGuiHelpers.h"
 
 
@@ -18,7 +19,9 @@ Flock::Flock(
 	Agents.SetNum(FlockSize);
 	
 	// --- Set Up Neighbors ---
+#ifndef GAMEAI_USE_SPACE_PARTITIONING
 	Neighbors.SetNum(FlockSize);
+#endif
 	NrOfNeighbors = 0;
 	
 	// --- Set Up Behaviours ---
@@ -58,9 +61,30 @@ Flock::Flock(
 		
 		if (IsValid(Agents[agentIdx]))
 			Agents[agentIdx]->SetActorTickEnabled(false);
-		
 	}
+
+#ifdef GAMEAI_USE_SPACE_PARTITIONING
+	// --- Create Partitioned space
+	pPartitionedSpace = std::make_unique<CellSpace>(
+		pWorld,
+		WorldSize*2,
+		WorldSize*2,
+		NrOfCellsX,
+		NrOfCellsX,
+		FlockSize
+	);
+
+	OldPositions.SetNum(FlockSize);
 	
+	// --- Add agents to partitioned space ---
+	for (int AgentIdx{ 0 }; AgentIdx < Agents.Num(); ++AgentIdx)
+	{
+		if (!IsValid(Agents[AgentIdx])) continue;
+		pPartitionedSpace->AddAgent(*Agents[AgentIdx]);
+		OldPositions[AgentIdx] = Agents[AgentIdx]->GetPosition();
+	}
+
+#endif
 	// --- Set Up Agent Behaviours ---
 	for (auto* pAgent : Agents)
 	{
@@ -89,24 +113,36 @@ void Flock::Tick(float DeltaTime)
 	}
 	
 	// --- Per-Agent Update ---
-	for (int AgentIdx{ 0 }; AgentIdx < Agents.Num(); ++AgentIdx)
+	for (int AgentIdx{0}; AgentIdx < Agents.Num(); ++AgentIdx)
 	{
 		auto* pAgent{ Agents[AgentIdx] };
-		
-		// --- Guard ---
+
 		if (!IsValid(pAgent)) continue;
-		
-		// --- Register neighbors for current agent ---
+#ifdef GAMEAI_USE_SPACE_PARTITIONING
+		pPartitionedSpace->RegisterNeighbors(*pAgent, NeighborhoodRadius);
+		NrOfNeighbors = pPartitionedSpace->GetNrOfNeighbors();
+#else
 		RegisterNeighbors(pAgent);
-		
-		// --- Go-To update ---
+#endif
 		pAgent->Tick(DeltaTime);
+#ifdef GAMEAI_USE_SPACE_PARTITIONING
+		pPartitionedSpace->UpdateAgentCell(
+			*pAgent,
+			OldPositions[AgentIdx]
+		);
+		OldPositions[AgentIdx] = pAgent->GetPosition();
+#endif
 	}
 }
 
 void Flock::RenderDebug()
 {
- // TODO: Render all the agents in the flock
+#ifdef GAMEAI_USE_SPACE_PARTITIONING
+	if (DebugRenderPartitions && pPartitionedSpace)
+	{
+		pPartitionedSpace->RenderCells();
+	}
+#endif
 }
 
 void Flock::ImGuiRender(ImVec2 const& WindowPos, ImVec2 const& WindowSize)
@@ -157,30 +193,22 @@ void Flock::ImGuiRender(ImVec2 const& WindowPos, ImVec2 const& WindowSize)
 		{			
 			if (float* wSeparation  = pBlendedSteering->GetWeight(pSeparationBehavior.get()))
 			{
-				float tmp = *wSeparation;
-				if (ImGui::SliderFloat("Separation", &tmp, 0.f, 1.f, "%.2f"))
-					*wSeparation = tmp;
+				ImGui::SliderFloat("Separation", wSeparation, 0.f, 1.f, "%.2f");
 			}
 			
 			if (float* wCohesion  = pBlendedSteering->GetWeight(pCohesionBehavior.get()))
 			{
-				float tmp = *wCohesion;
-				if (ImGui::SliderFloat("Cohesion", &tmp, 0.f, 1.f, "%.2f"))
-					*wCohesion = tmp;
+				ImGui::SliderFloat("Cohesion", wCohesion, 0.f, 1.f, "%.2f");
 			}
 			
 			if (float* wAlignment  = pBlendedSteering->GetWeight(pVelMatchBehavior.get()))
 			{
-				float tmp = *wAlignment;
-				if (ImGui::SliderFloat("Alignment", &tmp, 0.f, 1.f, "%.2f"))
-					*wAlignment = tmp;
+				ImGui::SliderFloat("Alignment", wAlignment, 0.f, 1.f, "%.2f");
 			}
 			
 			if (float* wWander  = pBlendedSteering->GetWeight(pWanderBehavior.get()))
 			{
-				float tmp = *wWander;
-				if (ImGui::SliderFloat("Wander", &tmp, 0.f, 1.f, "%.2f"))
-					*wWander = tmp;
+				ImGui::SliderFloat("Wander", wWander, 0.f, 1.f, "%.2f");
 			}
 		}
 		//End
@@ -204,7 +232,7 @@ void Flock::RenderNeighborhood()
 }
 
 #ifndef GAMEAI_USE_SPACE_PARTITIONING
-void Flock::RegisterNeighbors(ASteeringAgent* const pAgent)
+void Flock::RegisterNeighbors(const ASteeringAgent* pAgent)
 {
 	// --- Reset ---
 	NrOfNeighbors = 0;
@@ -213,7 +241,7 @@ void Flock::RegisterNeighbors(ASteeringAgent* const pAgent)
 	const auto& agentPos { pAgent->GetPosition()};
 	
 	// --- Compute Radius Squared ---
-	const float rSquared = NeighborhoodRadius * NeighborhoodRadius;
+	const float rSquared{ NeighborhoodRadius * NeighborhoodRadius};
 	
 	// --- Per-Agent check ---
 	for (ASteeringAgent* const pOther : Agents)
@@ -247,11 +275,16 @@ FVector2D Flock::GetAverageNeighborPos() const
 	if (NrOfNeighbors == 0) return AveragePosition;
 	
 	// --- Per agent addition ---
+#ifdef GAMEAI_USE_SPACE_PARTITIONING
+	for (auto AgentIdx{0}; AgentIdx < NrOfNeighbors; ++AgentIdx)
+		AveragePosition += pPartitionedSpace->GetNeighbors()[AgentIdx]->GetPosition();
+#else
 	for (auto AgentIdx{0}; AgentIdx < NrOfNeighbors; ++AgentIdx)
 		AveragePosition += Neighbors[AgentIdx]->GetPosition();
-	
+#endif
 	// --- Divide and Return ---
 	return AveragePosition / NrOfNeighbors;
+
 }
 
 FVector2D Flock::GetAverageNeighborVelocity() const
@@ -263,9 +296,13 @@ FVector2D Flock::GetAverageNeighborVelocity() const
 	if (NrOfNeighbors == 0) return AverageVelocity;
 	
 	// --- Sum-Up Velocity --- 
+#ifdef GAMEAI_USE_SPACE_PARTITIONING
+	for (auto AgentIdx{0}; AgentIdx < NrOfNeighbors; ++AgentIdx)
+		AverageVelocity += pPartitionedSpace->GetNeighbors()[AgentIdx]->GetLinearVelocity();
+#else
 	for (auto AgentIdx{0}; AgentIdx < NrOfNeighbors; ++AgentIdx )
 		AverageVelocity = AverageVelocity + Neighbors[AgentIdx]->GetLinearVelocity();
-	
+#endif
 	// --- Divide and return ---
 	return AverageVelocity / NrOfNeighbors;
 }

@@ -37,7 +37,7 @@ public:
 	void AddAgent(ASteeringAgent& Agent);
 	void UpdateAgentCell(ASteeringAgent& Agent, const FVector2D& OldPos);
 
-	void RegisterNeighbors(ASteeringAgent& Agent, float QueryRadius);
+	void RegisterNeighbors(const ASteeringAgent& Agent, float QueryRadius);
 	const TArray<ASteeringAgent*>& GetNeighbors() const { return Neighbors; }
 	int GetNrOfNeighbors() const { return NrOfNeighbors; }
 
@@ -68,5 +68,5 @@ private:
 
 	// Helper functions
 	int PositionToIndex(FVector2D const & Pos) const;
-	bool DoRectsOverlap(FRect const& RectA, FRect const& RectB);
+	static bool DoRectsOverlap(FRect const& RectA, FRect const& RectB);
 };
