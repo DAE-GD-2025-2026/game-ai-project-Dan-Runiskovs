@@ -22,6 +22,7 @@ TerrainGridGraph::TerrainGridGraph(TerrainNodeFactory* Factory, int Rows, int Co
 
 void TerrainGridGraph::PaintNodeAtPosition(FVector2D const& Position, TerrainNode::Type TypeToPaint)
 {
+	/*
 	int NodeId = GetNodeIdAtPosition(Position);
 	TerrainNode* AsTerrainNode = GetNodeAs<TerrainNode>(NodeId);
 	
@@ -59,6 +60,87 @@ void TerrainGridGraph::PaintNodeAtPosition(FVector2D const& Position, TerrainNod
 		else
 		{
 			ConnectionTo->SetWeight(GetDiagonalCost() * TerrainCostMultiplier);
+		}
+	} 
+	*/
+	int NodeId = GetNodeIdAtPosition(Position);
+	if (NodeId == Graphs::InvalidNodeId) return;
+
+	TerrainNode* pNode = GetNodeAs<TerrainNode>(NodeId);
+	if (!pNode) return;
+
+	TerrainNode::Type OldType = pNode->GetType();
+
+	// No change → do nothing
+	if (OldType == TypeToPaint)
+		return;
+
+	// Apply new terrain type
+	pNode->SetType(TypeToPaint);
+
+	// =============================
+	// 🧱 WATER HANDLING
+	// =============================
+
+	// If node WAS water → reconnect it
+	if (OldType == TerrainNode::Type::Water)
+	{
+		AddConnectionsToAdjacentCells(NodeId);
+		// ALSO reconnect neighbors back to THIS node
+		auto connections = FindConnectionsFrom(NodeId);
+
+		for (Connection* conn : connections)
+		{
+			int neighborId = conn->GetToId();
+			AddConnection(neighborId, NodeId);
+		}
+	}
+
+	// If node IS water → remove all connections and stop
+	if (TypeToPaint == TerrainNode::Type::Water)
+	{
+		RemoveConnectionsTo(NodeId);
+		RemoveConnectionsFrom(NodeId);
+		return;
+	}
+
+	// =============================
+	// ⚙️ UPDATE CONNECTION COSTS
+	// =============================
+
+	auto connections = FindConnectionsWith(NodeId);
+
+	for (Connection* pConnection : connections)
+	{
+		if (!pConnection) continue;
+
+		// Get both nodes of the connection
+		TerrainNode* fromNode = GetNodeAs<TerrainNode>(pConnection->GetFromId());
+		TerrainNode* toNode   = GetNodeAs<TerrainNode>(pConnection->GetToId());
+
+		if (!fromNode || !toNode) continue;
+
+		// Get terrain multipliers safely
+		auto maybeFrom = GetTerrainCostMultiplier(fromNode->GetType());
+		auto maybeTo   = GetTerrainCostMultiplier(toNode->GetType());
+
+		if (!maybeFrom.has_value() || !maybeTo.has_value())
+			continue;
+
+		float multiplierFrom = maybeFrom.value();
+		float multiplierTo   = maybeTo.value();
+
+		// Use the WORST terrain (most expensive)
+		float finalMultiplier = std::max(multiplierFrom, multiplierTo);
+
+		// Apply correct base cost
+		if (IsCardinalConnection(pConnection->GetFromId(), pConnection->GetToId()))
+		{
+			pConnection->SetWeight(GetCardinalCost() * finalMultiplier);
+		}
+		else
+		{
+			pConnection->SetWeight(GetDiagonalCost() * finalMultiplier);
 		}
 	}
 }
