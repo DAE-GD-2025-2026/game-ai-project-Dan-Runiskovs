@@ -30,6 +30,10 @@ std::vector<Node*>AStar::FindPath(Node* const pStartNode, Node* const pGoalNode)
 
 	NodeRecord currentRecord{};
 	bool bFoundGoal = false;
+	
+	// --- Fallback ---
+	NodeRecord bestNode = startRecord;
+	float bestScore = startRecord.estimatedTotalCost;
 
 	while (!openList.empty())
 	{
@@ -38,6 +42,12 @@ std::vector<Node*>AStar::FindPath(Node* const pStartNode, Node* const pGoalNode)
 
 		// Remove current now, before changing openList further
 		openList.erase(currentIt);
+		
+		if (currentRecord.estimatedTotalCost < bestScore)
+		{
+			bestScore = currentRecord.estimatedTotalCost;
+			bestNode = currentRecord;
+		}
 
 		if (currentRecord.pNode == pGoalNode)
 		{
@@ -110,7 +120,8 @@ std::vector<Node*>AStar::FindPath(Node* const pStartNode, Node* const pGoalNode)
 
 	if (!bFoundGoal)
 	{
-		return path;
+		UE_LOG(LogTemp, Warning, TEXT("A*: Goal unreachable, using fallback path"));
+		currentRecord = bestNode;
 	}
 
 	// Backtrack from goal to start
