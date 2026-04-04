@@ -57,9 +57,10 @@ public:
 	virtual SteeringOutput CalculateSteering(float DeltaT, ASteeringAgent & Agent) override;
 	virtual void DrawDebug(const ASteeringAgent & Agent) override;
 
+	void SetTargetRadius(float newRad) {m_TargetRadius = newRad;}
 protected:
-	const float m_SlowRadius{300.f};
-	const float m_TargetRadius{100.f};
+	float m_SlowRadius{300.f};
+	float m_TargetRadius{100.f};
 };
 
 class Face : public ISteeringBehavior
