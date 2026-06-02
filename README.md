@@ -26,3 +26,11 @@ I made Astar Pathfinding algorythm and Navmesh implementation.
 Both can bug out a little bit due to early mistake of Limiting Max Linear Speed on a Steering Agent... 
 I sadly barely had time to do this assignment, mind even fix my old mistakes (weak promise - i may do it)
 If the Steering Agent refuses to move, relaunch the level, because the max linear speed would be capped at 0.
+
+(3rd Edition - 02.06.2026)
+
+As the Extra assignment for the course of Algorythms 2, I have picked the implementation of Fallback Path for AStar pathfinding.
+As necessary to be stated. This extra assignment is a part of 05. Pathfinding algorythms topic, extension to the AStar exercice.
+
+How it works, is if no path is found to the goal, it takes the last best node visited, and reconstructs the path back to the starting node.
+ 

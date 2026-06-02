@@ -19,20 +19,19 @@ void ALevel_FSM::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	Agent = GetWorld()->SpawnActor<ASteeringAgent>(SteeringAgentClass, 
+	GuardAgent = GetWorld()->SpawnActor<ASteeringAgent>(SteeringAgentClass, 
 	FVector{0,0,90}, FRotator::ZeroRotator);
-	Agent->SetDebugRenderingEnabled(false);
+	GuardAgent->SetDebugRenderingEnabled(false);
 	
-	/* TODO
-	if (AGameAIController* AIController = Cast<AGameAIController>(Agent->GetController()))
+	
+	if (AGameAIController* AIController = Cast<AGameAIController>(GuardAgent->GetController()))
 	{
 		if (UFSMComponent* FSM = Cast<UFSMComponent>(AIController->GetBrainComponent()))
 		{
-			FSM->AddState(std::make_unique<GameAI::FSM::TestState>());
+			//FSM->AddState(std::make_unique<GameAI::FSM::TestState>());
 			AIController->RunFiniteStateMachine();
 		}
 	}
-	*/
 }
 
 // Called every frame

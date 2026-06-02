@@ -24,5 +24,7 @@ protected:
 
 private:
 	UPROPERTY()
-	ASteeringAgent* Agent{nullptr}; // ref
+	ASteeringAgent* GuardAgent{nullptr}; // ref
+	
+	ASteeringAgent* TheifAgent{nullptr}; // controlled by player
 };
